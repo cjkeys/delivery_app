@@ -67,18 +67,44 @@ def display_metrics(grouped_df):
     total_completed = grouped_df['num_completed'].sum()
     total_failed = grouped_df['num_failed'].sum()
     overall_success_rate = total_completed / (total_completed + total_failed) if total_completed + total_failed > 0 else 0
+    total_num = total_completed + total_failed
 
     # Create three columns for metrics
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric(label="Total Completed", value=total_completed)
-
+        st.metric(label="Total Number", value = total_num)
     with col2:
-        st.metric(label="Total Failed", value=total_failed)
-
+        st.metric(label="Total Completed", value=total_completed)
     with col3:
+        st.metric(label="Total Failed", value=total_failed)
+    with col4:
         st.metric(label="Overall Success Rate", value=f"{overall_success_rate:.0%}")
+    
+
+def groupDetrackJobs(df):
+    df_new = df[[
+    'id', 'primary_job_status', 'do_number', 'tracking_number',
+    'job_sequence', 'assign_to', 'address', 'postal_code', 'customer',
+    'detrack_number', 'reason', 'pod_time', 'run_number', 'items',
+    'milestones']]
+
+    grouped_df = df_new.groupby('run_number').agg(
+        total_num = ('primary_job_status', 'size'),
+        num_completed=('primary_job_status', lambda x: (x == 'completed').sum()),
+        num_failed=('primary_job_status', lambda x: (x == 'failed').sum())
+    ).reset_index()
+    # Calculate success rate
+    grouped_df['success_rate'] = grouped_df['num_completed'] / (
+        grouped_df['num_completed'] + grouped_df['num_failed']
+    )
+    return grouped_df
+
+def getFailedJobs(df):
+    df_failed = df[df['status']=='failed'].reset_index(drop=True).copy()
+    df_failed['first_item'] = df_failed['items'].str[0].apply(lambda x: x['description'] if isinstance(x, dict) else None)
+    df_failed = df_failed[['run_number', 'customer', 'reason', 'pod_time', 'postal_code', 'do_number', 'items_count', 'first_item']]
+    return df_failed
 
 # Streamlit app layout
 st.title("Detrack API Data Fetcher")
@@ -92,6 +118,7 @@ def load_app():
     if "df_new" not in st.session_state:
         st.session_state.df_new = None
         st.session_state.grouped_df = None
+        st.session_state.failed_df = None
 
     if st.button("Fetch and Process Data"):
         # Update the query parameters with the selected date
@@ -102,24 +129,11 @@ def load_app():
         if all_jobs:
             df = pd.DataFrame(all_jobs)
             st.session_state.df_new = clean_dataframe(df)
+            st.session_state.grouped_df = groupDetrackJobs(df)
+            # Format the success_rate column as a percentage
+            st.session_state.grouped_df['success_rate'] = st.session_state.grouped_df['success_rate'].map('{:.0%}'.format)
 
-            # Select specific columns and group by 'run_number'
-            st.session_state.df_new = st.session_state.df_new[[
-                'id', 'primary_job_status', 'do_number', 'tracking_number',
-                'job_sequence', 'assign_to', 'address', 'postal_code', 'customer',
-                'detrack_number', 'reason', 'pod_time', 'run_number', 'items',
-                'milestones'
-            ]]
-
-            st.session_state.grouped_df = st.session_state.df_new.groupby('run_number').agg(
-                num_completed=('primary_job_status', lambda x: (x == 'completed').sum()),
-                num_failed=('primary_job_status', lambda x: (x == 'failed').sum())
-            ).reset_index()
-
-            # Calculate success rate
-            st.session_state.grouped_df['success_rate'] = st.session_state.grouped_df['num_completed'] / (
-                st.session_state.grouped_df['num_completed'] + st.session_state.grouped_df['num_failed']
-            )
+            st.session_state.failed_df = getFailedJobs(df)
 
             st.success("Data fetched, cleaned, and grouped successfully.")
         else:
@@ -135,6 +149,10 @@ def load_app():
     if st.session_state.df_new is not None:
         csv = st.session_state.df_new.to_csv(index=False)
         st.download_button(label="Download Full Data as CSV", data=csv, file_name="detrack_data.csv", mime="text/csv")
+
+    if st.session_state.failed_df is not None:
+        st.write("All Failed Jobs")
+        st.write(st.session_state.failed_df)
 
 if st.session_state['authentication_status']:
     authenticator.logout('Logout', 'main')
