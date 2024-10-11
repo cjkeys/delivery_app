@@ -1,5 +1,5 @@
 streamlit
-streamlit-authenticator
+streamlit_authenticator
 pandas
 requests
 yaml
