@@ -1,0 +1,9 @@
+credentials:
+  usernames:
+    opsteam@thefirstmile.co.uk:
+      name: 'ops'
+      password: '$2b$12$5hTe0wpmSRYS.GRkdwgiB.Dk3rkdzZs79qSWI0Fu1EDAOaTlQavRm'
+cookie:
+  expiry_days: 10
+  key: 'dlkisj8ij'
+  name: cookie_authen
