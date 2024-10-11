@@ -15,7 +15,10 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login(location='main')
+try:
+    authenticator.login()
+except Exception as e:
+    st.error(e)
 
 # Detrack API endpoint and your API key
 api_url = "https://app.detrack.com/api/v2/dn/jobs"
@@ -133,10 +136,10 @@ def load_app():
         csv = st.session_state.df_new.to_csv(index=False)
         st.download_button(label="Download Full Data as CSV", data=csv, file_name="detrack_data.csv", mime="text/csv")
 
-if authentication_status:
+if st.session_state['authentication_status']:
     authenticator.logout('Logout', 'main')
     load_app()
-elif authentication_status == False:
+elif st.session_state['authentication_status'] == False:
     st.error('Username/password is incorrect')
-elif authentication_status == None:
+elif st.session_state['authentication_status'] == None:
     st.warning('Please enter your username and password')
