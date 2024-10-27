@@ -4,6 +4,11 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+from simple_salesforce import Salesforce
+
+sf = Salesforce(username=st.secrets["salesforce"]["username"],
+                password=st.secrets["salesforce"]["password"],
+                security_token=st.secrets["salesforce"]["security_token"])
 
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -92,7 +97,8 @@ def groupDetrackJobs(df):
     grouped_df = df_new.groupby('run_number').agg(
         total_num = ('primary_job_status', 'size'),
         num_completed=('primary_job_status', lambda x: (x == 'completed').sum()),
-        num_failed=('primary_job_status', lambda x: (x == 'failed').sum())
+        num_failed=('primary_job_status', lambda x: (x == 'failed').sum()),
+        num_failed_time=('primary_job_status', lambda x: ((x == 'failed') & (df_new.loc[x.index, 'reason'] == 'Ran out of Time')).sum())
     ).reset_index()
     # Calculate success rate
     grouped_df['success_rate'] = grouped_df['num_completed'] / (
@@ -105,6 +111,44 @@ def getFailedJobs(df):
     df_failed['first_item'] = df_failed['items'].str[0].apply(lambda x: x['description'] if isinstance(x, dict) else None)
     df_failed = df_failed[['run_number', 'customer', 'reason', 'pod_time', 'postal_code', 'do_number', 'items_count', 'first_item']]
     return df_failed
+
+def dataframeFromSF(query):
+    results = sf.query_all(query)
+    df = pd.DataFrame(results['records']).drop(columns='attributes')
+    return df
+
+def get_daily_dispatch_driver(date):
+    query = f"""
+        SELECT Id, Name, Ops_Start_Time__c, Ops_End_Time__c, DriverId__c, Dispatch_Date__c
+        FROM DailyDispatch__c
+        WHERE Dispatch_Date__c = {date}
+    """
+
+    df = dataframeFromSF(query)
+
+    df[['Ops_Start_Time__c', 'Ops_End_Time__c']] = df[['Ops_Start_Time__c', 'Ops_End_Time__c']].apply(pd.to_datetime)
+    df['duration'] = df['Ops_End_Time__c'] - df['Ops_Start_Time__c']
+    df['duration_hh_mm'] = df['duration'].astype(str).str.split().str[-1].str[:-3]
+
+    df['start_time_hh_mm'] = df['Ops_Start_Time__c'].dt.strftime("%H:%M")
+    df['end_time_hh_mm'] = df['Ops_End_Time__c'].dt.strftime("%H:%M")
+
+    ## get driver data
+
+    query = """
+    SELECT Id, Name, Job_Title__c
+    FROM Driver__c
+    """
+    df_driver = dataframeFromSF(query)
+    df_driver.rename(columns={'Id': 'DriverId', 'Name': 'Driver_Name'}, inplace=True)
+
+    df = pd.merge(df, df_driver, left_on = "DriverId__c", right_on="DriverId", how="left")
+    return df
+
+def prep_dd_display(df):
+    df = df.dropna(subset='Ops_Start_Time__c')
+    df = df[df['Name'].str.contains("DELIVERY")].reset_index(drop=True)
+    df = df[['Name', 'start_time_hh_mm', 'end_time_hh_mm', 'duration_hh_mm', 'Driver_Name']]
 
 # Streamlit app layout
 st.title("Detrack API Data Fetcher")
@@ -125,6 +169,7 @@ def load_app():
         params = {**default_params, "date": selected_date.strftime("%Y-%m-%d")}
 
         all_jobs = get_all_detrack_jobs(params)
+        df_dispatch = prep_dd_display(get_daily_dispatch_driver(selected_date.strftime("%Y-%m-%d")))
 
         if all_jobs:
             df = pd.DataFrame(all_jobs)
@@ -144,6 +189,8 @@ def load_app():
         display_metrics(st.session_state.grouped_df)
         st.write("Summary of jobs by Route Number:")
         st.write(st.session_state.grouped_df)
+        st.write("Dispatch and driver info")
+        st.write(df_dispatch)
 
     # CSV download button for the full DataFrame (df_new)
     if st.session_state.df_new is not None:

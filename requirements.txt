@@ -3,3 +3,4 @@ streamlit-authenticator
 pandas
 requests
 PyYAML
+simple_salesforce
