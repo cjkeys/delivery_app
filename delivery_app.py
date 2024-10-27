@@ -123,7 +123,6 @@ def get_daily_dispatch_driver(date):
         FROM DailyDispatch__c
         WHERE Dispatch_Date__c = {date}
     """
-
     df = dataframeFromSF(query)
 
     df[['Ops_Start_Time__c', 'Ops_End_Time__c']] = df[['Ops_Start_Time__c', 'Ops_End_Time__c']].apply(pd.to_datetime)
@@ -148,7 +147,10 @@ def get_daily_dispatch_driver(date):
 def prep_dd_display(df):
     df = df.dropna(subset='Ops_Start_Time__c')
     df = df[df['Name'].str.contains("DELIVERY")].reset_index(drop=True)
-    df = df[['Name', 'start_time_hh_mm', 'end_time_hh_mm', 'duration_hh_mm', 'Driver_Name']]
+    df = df[['Name', 'Driver_Name', 'start_time_hh_mm', 'end_time_hh_mm', 'duration_hh_mm']]
+    df.rename(columns = {'start_time_hh_mm' : 'start_time',
+                          'end_time_hh_mm' : 'end_time'}, inplace=True)
+    return df
 
 # Streamlit app layout
 st.title("Detrack API Data Fetcher")
