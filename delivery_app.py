@@ -152,6 +152,20 @@ def prep_dd_display(df):
                           'end_time_hh_mm' : 'end_time'}, inplace=True)
     return df
 
+def mergeDelivery(df_detrack, df_sf):
+    df_detrack['run_number'] = df_detrack['run_number'].str.replace("EM11", "EM1.1 ")
+    df_detrack['run_number'] = df_detrack['run_number'].str.replace("EM12", "EM1.2 ")
+    df_detrack['Name'] = df_detrack['run_number'].str.split(" ").str[0]
+
+    df_sf['Name'] = df_sf['Name'].str.replace("DELIVERY - ", "").str.strip()
+    df_sf['Name'] = df_sf['Name'].str.split(" ").str[0]
+
+    df_merged = pd.merge(df_sf, df_detrack, on='Name', how='right')
+    df_merged = df_merged[['Name', 'Driver_Name', 'start_time', 'end_time', 'duration_hh_mm',
+           'success_rate', 'run_number', 'total_num', 'num_completed', 'num_failed',
+       'num_failed_time']]
+    return df_merged
+
 # Streamlit app layout
 st.title("Detrack API Data Fetcher")
 def load_app():
@@ -189,6 +203,8 @@ def load_app():
     # Display metrics and summary if grouped data is available
     if st.session_state.grouped_df is not None:
         display_metrics(st.session_state.grouped_df)
+        st.write("Salesforce and Detrack Data")
+        st.write(mergeDelivery(st.session_state.grouped_df, df_dispatch))
         st.write("Summary of jobs by Route Number:")
         st.write(st.session_state.grouped_df)
         st.write("Dispatch and driver info")
