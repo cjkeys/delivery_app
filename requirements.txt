@@ -6,3 +6,4 @@ PyYAML
 simple_salesforce
 folium
 numpy
+streamlit_folium
