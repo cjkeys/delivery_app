@@ -4,3 +4,5 @@ pandas
 requests
 PyYAML
 simple_salesforce
+folium
+numpy

@@ -5,6 +5,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 from simple_salesforce import Salesforce
+import folium
 
 sf = Salesforce(username=st.secrets["salesforce"]["username"],
                 password=st.secrets["salesforce"]["password"],
@@ -98,7 +99,8 @@ def groupDetrackJobs(df):
         total_num = ('primary_job_status', 'size'),
         num_completed=('primary_job_status', lambda x: (x == 'completed').sum()),
         num_failed=('primary_job_status', lambda x: (x == 'failed').sum()),
-        num_failed_time=('primary_job_status', lambda x: ((x == 'failed') & (df_new.loc[x.index, 'reason'] == 'Ran out of Time')).sum())
+        num_failed_time=('primary_job_status', lambda x: ((x == 'failed') & (df_new.loc[x.index, 'reason'] == 'Ran out of Time')).sum()),
+        num_in_progress=('primary_job_status', lambda x: (x == 'dispatched').sum())
     ).reset_index()
     # Calculate success rate
     grouped_df['success_rate'] = grouped_df['num_completed'] / (
@@ -125,8 +127,11 @@ def get_daily_dispatch_driver(date):
     """
     df = dataframeFromSF(query)
 
-    df[['Ops_Start_Time__c', 'Ops_End_Time__c']] = df[['Ops_Start_Time__c', 'Ops_End_Time__c']].apply(pd.to_datetime)
-    df['duration'] = df['Ops_End_Time__c'] - df['Ops_Start_Time__c']
+    df[['Ops_Start_Time__c', 'Ops_End_Time__c']] = df[['Ops_Start_Time__c', 'Ops_End_Time__c']].apply(pd.to_datetime, errors='coerce')
+    # Calculate duration, set to None where there's an error
+    df['duration'] = df.apply(lambda row: row['Ops_End_Time__c'] - row['Ops_Start_Time__c'] if pd.notna(
+        row['Ops_End_Time__c']) and pd.notna(row['Ops_Start_Time__c']) else None, axis=1)
+
     df['duration_hh_mm'] = df['duration'].astype(str).str.split().str[-1].str[:-3]
 
     df['start_time_hh_mm'] = df['Ops_Start_Time__c'].dt.strftime("%H:%M")
@@ -163,8 +168,9 @@ def mergeDelivery(df_detrack, df_sf):
     df_merged = pd.merge(df_sf, df_detrack, on='Name', how='right')
     df_merged = df_merged[['Name', 'Driver_Name', 'start_time', 'end_time', 'duration_hh_mm',
            'success_rate', 'run_number', 'total_num', 'num_completed', 'num_failed',
-       'num_failed_time']]
+       'num_failed_time', 'num_in_progress']]
     return df_merged
+
 
 # Streamlit app layout
 st.title("Detrack API Data Fetcher")
