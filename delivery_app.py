@@ -106,6 +106,7 @@ def groupDetrackJobs(df):
     grouped_df['success_rate'] = grouped_df['num_completed'] / (
         grouped_df['num_completed'] + grouped_df['num_failed']
     )
+    grouped_df['run_number'] = grouped_df['run_number'].str.replace('"', '', regex=False)
     return grouped_df
 
 def getFailedJobs(df):
@@ -164,7 +165,6 @@ def mergeDelivery(df_detrack, df_sf):
 
     df_sf['Name'] = df_sf['Name'].str.replace("DELIVERY - ", "").str.strip()
     df_sf['Name'] = df_sf['Name'].str.split(" ").str[0]
-    df_sf['Name'] = df_sf['Name'].str.replace('"', '', regex=False)
 
     df_merged = pd.merge(df_sf, df_detrack, on='Name', how='right')
     df_merged = df_merged[['Name', 'Driver_Name', 'start_time', 'end_time', 'duration_hh_mm',
