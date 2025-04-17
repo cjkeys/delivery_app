@@ -164,6 +164,7 @@ def mergeDelivery(df_detrack, df_sf):
 
     df_sf['Name'] = df_sf['Name'].str.replace("DELIVERY - ", "").str.strip()
     df_sf['Name'] = df_sf['Name'].str.split(" ").str[0]
+    df_sf['Name'] = df_sf['Name'].str.replace('"', '', regex=False)
 
     df_merged = pd.merge(df_sf, df_detrack, on='Name', how='right')
     df_merged = df_merged[['Name', 'Driver_Name', 'start_time', 'end_time', 'duration_hh_mm',
