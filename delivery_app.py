@@ -7,9 +7,9 @@ from yaml.loader import SafeLoader
 from simple_salesforce import Salesforce
 import folium
 
-sf = Salesforce(username=st.secrets["salesforce"]["username"],
-                password=st.secrets["salesforce"]["password"],
-                security_token=st.secrets["salesforce"]["security_token"])
+# sf = Salesforce(username=st.secrets["salesforce"]["username"],
+#                 password=st.secrets["salesforce"]["password"],
+#                 security_token=st.secrets["salesforce"]["security_token"])
 
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
