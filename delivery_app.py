@@ -7,9 +7,14 @@ from yaml.loader import SafeLoader
 from simple_salesforce import Salesforce
 import folium
 
-# sf = Salesforce(username=st.secrets["salesforce"]["username"],
-#                 password=st.secrets["salesforce"]["password"],
-#                 security_token=st.secrets["salesforce"]["security_token"])
+_sf = None
+def get_sf():
+    global _sf
+    if _sf is None:
+        _sf = Salesforce(username=st.secrets["salesforce"]["username"],
+                         password=st.secrets["salesforce"]["password"],
+                         security_token=st.secrets["salesforce"]["security_token"])
+    return _sf
 
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -116,6 +121,7 @@ def getFailedJobs(df):
     return df_failed
 
 def dataframeFromSF(query):
+    sf = get_sf()
     results = sf.query_all(query)
     df = pd.DataFrame(results['records']).drop(columns='attributes')
     return df
